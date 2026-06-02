@@ -127,43 +127,49 @@ const WORKOUTS = [
     name: 'Pull Up Guide',
     tag: 'Skill Based',
     videoUrl: 'https://www.youtube.com/watch?v=cqZoO_TKBcQ&t=7s',
+    infoNote: 'Watch the session video first — understanding shoulder movement is key for every exercise in this workout.',
     groups: [
       {
         name: 'WARM UP',
         exercises: [
           { name: 'Full Body Warm Up', sets: 1, reps: "10-15'", isBodyweight: true },
-          { name: 'Scapular Pulls', sets: 2, reps: '20 reps', isBodyweight: true },
-          { name: 'One Arm Scapular Pulls', sets: 2, reps: '10-15 reps', isBodyweight: true }
+          { name: 'Scapular Pulls', sets: 2, reps: '20 reps', isBodyweight: true, note: 'Both arms' },
+          { name: 'One Arm Scapular Pulls', sets: 2, reps: '10-15 reps', isBodyweight: true, note: "Progression — only move to this once you can do 20 pull-ups in a row" }
         ]
       },
       {
         name: 'LEVEL 1',
+        notes: ['Slowly reduce your angle to increase difficulty as you progress toward Level 2.', 'Quality over quantity!'],
         exercises: [
-          { name: 'Rings Rows', sets: 3, reps: '8-15 reps', isBodyweight: true }
+          { name: 'Rings Rows', sets: 3, reps: '8-15 reps', isBodyweight: true, note: 'Always retract your shoulders before pulling' }
         ]
       },
       {
         name: 'LEVEL 2',
+        notes: ['Progress to Level 3 once 3 sets of 15 are doable.', 'Avoid bending your thoracic spine — pull, don\'t bend!'],
         exercises: [
-          { name: 'Rings Rows (underneath anchor point)', sets: 3, reps: '8-15 reps', isBodyweight: true }
+          { name: 'Rings Rows (underneath anchor point)', sets: 3, reps: '8-15 reps', isBodyweight: true, note: 'Always retract your shoulders before pulling' }
         ]
       },
       {
         name: 'LEVEL 3',
+        notes: ['Progress to Level 4 once 3 sets of 15 are doable.', 'Avoid bending your thoracic spine — pull, don\'t bend!'],
         exercises: [
-          { name: 'Rings Rows (elevated feet)', sets: 3, reps: '8-15 reps', isBodyweight: true }
+          { name: 'Rings Rows (elevated feet)', sets: 3, reps: '8-15 reps', isBodyweight: true, note: 'Always retract your shoulders before pulling' }
         ]
       },
       {
         name: 'LEVEL 4',
+        notes: ['Progress to Level 5 once 3 sets of 15 are doable.', 'Avoid bending your thoracic spine — pull, don\'t bend!'],
         exercises: [
-          { name: 'Pull-Ups (banded)', sets: 3, reps: '8-15 reps', isBodyweight: true }
+          { name: 'Pull-Ups (banded)', sets: 3, reps: '8-15 reps', isBodyweight: true, note: 'Bring shoulders into depression before each rep' }
         ]
       },
       {
         name: 'LEVEL 5',
+        notes: ["Congratulations, you've made it! 🥳", "If stuck on 1 rep, try EMOM training. Reach out if you've been stuck on any level for a while."],
         exercises: [
-          { name: 'Pull-Ups', sets: 5, reps: '1 rep', isBodyweight: true }
+          { name: 'Pull-Ups', sets: 5, reps: '1 rep', isBodyweight: true, note: 'Bring shoulders into depression before each rep' }
         ]
       }
     ]
@@ -345,6 +351,14 @@ function viewActive() {
       + 'Last completed '+new Date(lastSess.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'.</div>';
   }
 
+  // Info note
+  if (w.infoNote) {
+    html += '<div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;">'
+      + '<svg width="15" height="15" fill="none" stroke="#92400E" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+      + '<p style="font-size:12px;color:#92400E;line-height:1.5;">'+w.infoNote+'</p>'
+      + '</div>';
+  }
+
   // Video card
   if (w.videoUrl) {
     html += '<div class="video-card">'
@@ -360,7 +374,7 @@ function viewActive() {
       + '</button></div>';
   }
 
-  // Exercise groups (populated as George adds skill drills)
+  // Exercise groups
   if (w.groups && w.groups.length > 0) {
     w.groups.forEach(function(group, gi) {
       html += '<div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid var(--border);">'
@@ -380,7 +394,9 @@ function viewActive() {
             + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">'
             + '<span style="color:#0D1B2E;font-size:13px;font-weight:600;flex:1;min-width:0;">'+ex.name+(ex.video ? ' <button onclick="openVideo(\''+ex.video+'\')" style="color:var(--accent);font-size:11px;background:none;border:none;cursor:pointer;">▶</button>' : '')+'</span>'
             + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;flex-shrink:0;">'+ex.sets+' × '+ex.reps+'</span>'
-            + '</div>'+lastHint
+            + '</div>'
+            + (ex.note ? '<p style="color:#B45309;font-size:11px;margin-bottom:6px;font-style:italic;">'+ex.note+'</p>' : '')
+            + lastHint
             + '<div style="display:grid;grid-template-columns:28px 1fr;gap:4px;margin-bottom:4px;padding:0 2px;">'
             + '<span style="font-size:10px;color:#9CA3AF;">SET</span>'
             + '<span style="font-size:10px;color:#9CA3AF;text-align:center;">REPS</span></div>';
@@ -406,7 +422,9 @@ function viewActive() {
             + ex.name+(ex.video?' <span style="color:var(--accent);font-size:11px;">▶</span>':'')
             + '</button>'
             + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;flex-shrink:0;">'+(ex.setsLabel||ex.sets)+' × '+ex.reps+'</span>'
-            + '</div>'+lastHint2
+            + '</div>'
+            + (ex.note ? '<p style="color:#B45309;font-size:11px;margin-bottom:6px;font-style:italic;">'+ex.note+'</p>' : '')
+            + lastHint2
             + '<div style="display:grid;grid-template-columns:28px 1fr 1fr;gap:4px;margin-bottom:4px;padding:0 2px;">'
             + '<span style="font-size:10px;color:#9CA3AF;">SET</span>'
             + '<span style="font-size:10px;color:#9CA3AF;text-align:center;">WEIGHT (kg)</span>'
@@ -421,6 +439,16 @@ function viewActive() {
           html += '</div>';
         }
       });
+
+      // Group progression notes
+      if (group.notes && group.notes.length) {
+        html += '<div style="margin-top:14px;padding-top:14px;border-top:1px solid #F3F4F6;">';
+        group.notes.forEach(function(n) {
+          html += '<p style="font-size:11px;color:#6B7280;line-height:1.5;margin-bottom:4px;">💡 '+n+'</p>';
+        });
+        html += '</div>';
+      }
+
       html += '</div>';
     });
   }
