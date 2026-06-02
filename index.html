@@ -377,9 +377,9 @@ function viewActive() {
             if (parts.length) lastHint = '<p style="color:#9CA3AF;font-size:11px;margin-bottom:8px;">Last: '+parts.join(' · ')+'</p>';
           }
           html += '<div>'
-            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">'
-            + '<span style="color:#0D1B2E;font-size:13px;font-weight:600;">'+ex.name+(ex.video ? ' <button onclick="openVideo(\''+ex.video+'\')" style="color:var(--accent);font-size:11px;background:none;border:none;cursor:pointer;">▶</button>' : '')+'</span>'
-            + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;">'+ex.sets+' × '+ex.reps+'</span>'
+            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">'
+            + '<span style="color:#0D1B2E;font-size:13px;font-weight:600;flex:1;min-width:0;">'+ex.name+(ex.video ? ' <button onclick="openVideo(\''+ex.video+'\')" style="color:var(--accent);font-size:11px;background:none;border:none;cursor:pointer;">▶</button>' : '')+'</span>'
+            + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;flex-shrink:0;">'+ex.sets+' × '+ex.reps+'</span>'
             + '</div>'+lastHint
             + '<div style="display:grid;grid-template-columns:28px 1fr;gap:4px;margin-bottom:4px;padding:0 2px;">'
             + '<span style="font-size:10px;color:#9CA3AF;">SET</span>'
@@ -401,11 +401,11 @@ function viewActive() {
             if (parts2.length) lastHint2 = '<p style="color:#9CA3AF;font-size:11px;margin-bottom:8px;">Last: '+parts2.join(' · ')+'</p>';
           }
           html += '<div>'
-            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">'
-            + '<button onclick="openVideo(\''+(ex.video||'')+'\')" style="color:#0D1B2E;font-size:13px;font-weight:600;text-align:left;background:none;border:none;cursor:'+(ex.video?'pointer':'default')+';">'
+            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px;">'
+            + '<button onclick="openVideo(\''+(ex.video||'')+'\')" style="color:#0D1B2E;font-size:13px;font-weight:600;text-align:left;background:none;border:none;cursor:'+(ex.video?'pointer':'default')+';flex:1;min-width:0;">'
             + ex.name+(ex.video?' <span style="color:var(--accent);font-size:11px;">▶</span>':'')
             + '</button>'
-            + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;">'+(ex.setsLabel||ex.sets)+' × '+ex.reps+'</span>'
+            + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;flex-shrink:0;">'+(ex.setsLabel||ex.sets)+' × '+ex.reps+'</span>'
             + '</div>'+lastHint2
             + '<div style="display:grid;grid-template-columns:28px 1fr 1fr;gap:4px;margin-bottom:4px;padding:0 2px;">'
             + '<span style="font-size:10px;color:#9CA3AF;">SET</span>'
