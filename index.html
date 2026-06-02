@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calisthenics Made Easy | Coach George Santos</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CME" />
+  <meta name="theme-color" content="#0F172A" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    :root{
+      --accent:#D97706;
+      --accent-light:#FEF3C7;
+      --accent-text:#92400E;
+      --accent-shadow:rgba(217,119,6,.35);
+      --bg:#F8F7F4;
+      --card:#FFFFFF;
+      --text:#1C1C1C;
+      --muted:#6B7280;
+      --border:#E5E7EB;
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);min-height:100vh;color:var(--text);}
+    h1,h2,h3,h4{font-weight:800;letter-spacing:-0.5px;}
+    input[type=number]{-moz-appearance:textfield;}
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+    .fade-in{animation:fi .2s ease;}
+    @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .nav-active{color:var(--accent);border-bottom:2px solid var(--accent);}
+    .nav-off{color:#9CA3AF;border-bottom:2px solid transparent;}
+    .card{background:var(--card);border-radius:14px;padding:20px;margin-bottom:14px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.05);}
+    .back-btn{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;background:none;border:none;cursor:pointer;margin-bottom:16px;padding:0;}
+    .back-btn:hover{color:var(--text);}
+    .cta-btn{display:inline-block;background:var(--accent);color:#fff;font-size:1rem;font-weight:700;padding:16px 36px;border-radius:12px;border:none;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 24px var(--accent-shadow);transition:transform .15s,box-shadow .15s;text-decoration:none;}
+    .cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px var(--accent-shadow);}
+    .pill{display:inline-block;background:var(--accent-light);color:var(--accent-text);font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;}
+    .video-card{background:#FFFBEB;border:1px solid #FDE68A;border-radius:14px;padding:20px;margin-bottom:16px;}
+    .skill-row{background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+  </style>
+</head>
+<body style="padding-bottom:80px;">
+
+<div id="app"></div>
+<nav id="nav-bar"></nav>
+
+<script>
+// ── WORKOUT DATA ────────────────────────────────────────────────
+// Each workout can have:
+//   videoUrl  — opens YouTube / any URL on "Watch Video" tap
+//   groups    — array of exercise groups (empty = video-only session)
+//
+// Exercise types inside groups:
+//   isBodyweight:true  — reps only, no weight column
+//   (default)          — weight + reps (for weighted moves)
+const WORKOUTS = [
+  {
+    id: 'w1',
+    name: '10 Min Full-Body Warm Up',
+    tag: 'No Equipment Needed',
+    videoUrl: 'https://www.youtube.com/watch?v=hb0kqY7oA1c&t=21s',
+    groups: []
+  },
+];
+
+// ── FIREBASE CONFIG (same project as Comeback Strong & HGS) ────
+const FB_CFG = {
+  apiKey: "AIzaSyCynk-RlZWs6RhtePLPjwULifvT6RY6ZG8",
+  authDomain: "comeback-strong.firebaseapp.com",
+  projectId: "comeback-strong",
+  storageBucket: "comeback-strong.firebasestorage.app",
+  messagingSenderId: "56190885384",
+  appId: "1:56190885384:web:96fe6787f6f7e8d6c5fbbd"
+};
+
+// ── STATE ──────────────────────────────────────────────────────
+var fbAuth, db;
+var uid = null;
+var authResolved = false;
+var cachedSessions = [];
+
+var appState = {
+  view: 'loading',
+  workoutIdx: null,
+  sessionId: null,
+};
+
+// ── SESSION STORAGE ────────────────────────────────────────────
+function getSessions() { return cachedSessions; }
+
+async function saveSessionData(s) {
+  cachedSessions.unshift(s);
+  if (db && uid) {
+    await db.collection('users').doc(uid).collection('cme_sessions').doc(String(s.id)).set(s);
+  } else {
+    var all = JSON.parse(localStorage.getItem('cme_sessions') || '[]');
+    all.unshift(s);
+    localStorage.setItem('cme_sessions', JSON.stringify(all));
+  }
+}
+
+async function deleteSessionData(id) {
+  cachedSessions = cachedSessions.filter(function(s){ return s.id !== id; });
+  if (db && uid) {
+    await db.collection('users').doc(uid).collection('cme_sessions').doc(String(id)).delete();
+  } else {
+    var all = JSON.parse(localStorage.getItem('cme_sessions') || '[]').filter(function(s){ return s.id !== id; });
+    localStorage.setItem('cme_sessions', JSON.stringify(all));
+  }
+}
+
+// ── VIDEO ──────────────────────────────────────────────────────
+function openVideo(url) {
+  if (!url) return;
+  window.open(url, '_blank');
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────
+function showView(v) {
+  if (!uid && v !== 'auth') { appState.view = 'auth'; render(); return; }
+  appState.view = v;
+  renderNav(v);
+  render();
+}
+
+function renderNav(active) {
+  var tabs = [
+    {id:'programs', label:'Programs', icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'},
+    {id:'history',  label:'History',  icon:'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'},
+  ];
+  if (!uid) { document.getElementById('nav-bar').innerHTML = ''; return; }
+  var html = '<div style="position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #E5E7EB;display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);">';
+  tabs.forEach(function(t) {
+    var cls = (active === t.id) ? 'nav-active' : 'nav-off';
+    html += '<button onclick="showView(\''+t.id+'\')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 0 8px;background:none;border:none;cursor:pointer;" class="'+cls+'">'
+      + '<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-bottom:2px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="'+t.icon+'"/></svg>'
+      + '<span style="font-size:10px;font-weight:600;letter-spacing:.04em;">'+t.label+'</span>'
+      + '</button>';
+  });
+  html += '</div>';
+  document.getElementById('nav-bar').innerHTML = html;
+}
+
+// ── RENDER ─────────────────────────────────────────────────────
+function render() {
+  var html = '';
+  if      (appState.view === 'loading')  html = viewLoading();
+  else if (appState.view === 'auth')     html = viewAuth();
+  else if (appState.view === 'programs') html = viewPrograms();
+  else if (appState.view === 'active')   html = viewActive();
+  else if (appState.view === 'history')  html = viewHistory();
+  else if (appState.view === 'detail')   html = viewDetail();
+  document.getElementById('app').innerHTML = html;
+}
+
+function viewLoading() {
+  return '<div style="display:flex;align-items:center;justify-content:center;height:100vh;">'
+    + '<div style="width:36px;height:36px;border:3px solid #E5E7EB;border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;"></div></div>';
+}
+
+// ── AUTH VIEW ─────────────────────────────────────────────────
+function viewAuth() {
+  return '<div style="background:linear-gradient(160deg,#0F172A 0%,#1E3A5F 50%,#0F172A 100%);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;text-align:center;">'
+    + '<div style="background:rgba(217,119,6,.15);border:1px solid rgba(217,119,6,.3);display:inline-block;padding:6px 18px;border-radius:999px;margin-bottom:28px;">'
+    + '<span style="color:#FDE68A;font-size:.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Calisthenics Made Easy</span></div>'
+    + '<h1 style="color:#fff;font-size:clamp(2.2rem,8vw,3.8rem);font-weight:800;letter-spacing:-2px;line-height:1;margin-bottom:12px;">Build Skills.<br><span style="color:#D97706;">Move Better.</span></h1>'
+    + '<p style="color:rgba(255,255,255,.55);font-size:.95rem;line-height:1.7;margin-bottom:8px;max-width:320px;">A progressive skill-based calisthenics system.</p>'
+    + '<p style="color:rgba(255,255,255,.35);font-size:.78rem;margin-bottom:40px;">Program by <strong style="color:rgba(255,255,255,.5);">Coach George Santos</strong></p>'
+    + '<button onclick="signInWithGoogle()" style="background:#fff;color:#1C1C1C;font-size:.95rem;font-weight:700;padding:16px 32px;border-radius:12px;border:none;cursor:pointer;display:flex;align-items:center;gap:10px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.3);transition:transform .15s;" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">'
+    + '<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>'
+    + 'Sign in with Google</button>'
+    + '</div>';
+}
+
+async function signInWithGoogle() {
+  var provider = new firebase.auth.GoogleAuthProvider();
+  try { await fbAuth.signInWithPopup(provider); }
+  catch(e) { console.error(e); }
+}
+
+async function signOut() {
+  await fbAuth.signOut();
+  uid = null;
+  cachedSessions = [];
+  appState.view = 'auth';
+  renderNav('');
+  render();
+}
+
+// ── PROGRAMS VIEW ─────────────────────────────────────────────
+function viewPrograms() {
+  var sessions = getSessions();
+  var total = WORKOUTS.length;
+  var nextIdx = total > 0 ? sessions.length % total : 0;
+  var nextWorkout = WORKOUTS[nextIdx];
+
+  var html = '<div class="fade-in" style="background:var(--bg);min-height:100vh;padding-bottom:80px;">';
+
+  html += '<div style="background:linear-gradient(160deg,#0F172A 0%,#1E3A5F 100%);padding:40px 20px 32px;">'
+    + '<p style="color:rgba(255,255,255,.45);font-size:.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Coach George Santos</p>'
+    + '<h1 style="color:#fff;font-size:clamp(1.6rem,6vw,2.4rem);font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:16px;">Calisthenics Made Easy</h1>'
+    + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+    + '<span style="background:rgba(217,119,6,.2);border:1px solid rgba(217,119,6,.4);color:#FDE68A;font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 12px;border-radius:999px;">'
+    + total + ' Workout' + (total !== 1 ? 's' : '') + ' · Skill-Based</span>'
+    + '<span style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);font-size:.7rem;font-weight:600;padding:5px 12px;border-radius:999px;">'
+    + sessions.length + ' Session' + (sessions.length !== 1 ? 's' : '') + ' Logged</span>'
+    + '</div></div>';
+
+  html += '<div style="padding:20px 16px 0;max-width:480px;margin:0 auto;">'
+    + '<p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:10px;">Next Up</p>'
+    + '<div onclick="startWorkout('+nextIdx+')" style="background:#fff;border:2px solid var(--accent);border-radius:16px;padding:20px;margin-bottom:24px;cursor:pointer;box-shadow:0 4px 20px var(--accent-shadow);">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">'
+    + '<div>'
+    + '<span style="background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;letter-spacing:.5px;display:inline-block;margin-bottom:6px;">NEXT</span>'
+    + '<h2 style="font-size:1.4rem;font-weight:800;letter-spacing:-0.5px;color:#0D1B2E;">'+nextWorkout.name+'</h2>'
+    + (nextWorkout.tag ? '<p style="color:var(--muted);font-size:.8rem;margin-top:2px;">'+nextWorkout.tag+'</p>' : '')
+    + '</div>'
+    + '<svg width="22" height="22" fill="none" stroke="var(--accent)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>'
+    + '</div>'
+    + '<button onclick="event.stopPropagation();startWorkout('+nextIdx+')" class="cta-btn" style="width:100%;text-align:center;padding:14px;font-size:1rem;border-radius:10px;">Start Session →</button>'
+    + '</div>';
+
+  html += '<p style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px;">All Workouts</p>';
+
+  WORKOUTS.forEach(function(w, idx) {
+    var isNext = (idx === nextIdx);
+    var isDone = (idx < nextIdx);
+    var borderLeft = isNext ? '4px solid var(--accent)' : (isDone ? '4px solid #10B981' : '4px solid transparent');
+    var bg = isNext ? 'background:#FFFBEB;' : '';
+    var iconBg = isNext ? 'var(--accent)' : (isDone ? '#DCFCE7' : '#F3F4F6');
+    var iconContent = isDone
+      ? '<svg width="16" height="16" fill="none" stroke="#166534" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>'
+      : '<span style="font-size:11px;font-weight:800;color:'+(isNext?'#fff':'#6B7280')+';">'+(idx+1)+'</span>';
+
+    html += '<div onclick="startWorkout('+idx+')" style="background:#fff;'+bg+'border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border);border-left:'+borderLeft+';cursor:pointer;display:flex;align-items:center;gap:12px;">'
+      + '<div style="width:36px;height:36px;border-radius:10px;background:'+iconBg+';display:flex;align-items:center;justify-content:center;flex-shrink:0;">'+iconContent+'</div>'
+      + '<div style="flex:1;min-width:0;">'
+      + '<p style="font-weight:700;font-size:.9rem;color:#0D1B2E;">'+w.name+'</p>'
+      + (w.tag ? '<p style="font-size:.75rem;color:var(--muted);">'+w.tag+'</p>' : '')
+      + '</div>'
+      + (w.videoUrl
+          ? '<svg width="18" height="18" fill="none" stroke="var(--accent)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+          : '<svg width="16" height="16" fill="none" stroke="#CBD5E1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>')
+      + '</div>';
+  });
+
+  html += '<div style="text-align:center;padding:24px 0;">'
+    + '<button onclick="signOut()" style="background:none;border:none;color:#9CA3AF;font-size:13px;cursor:pointer;">Sign out</button>'
+    + '</div>'
+    + '</div></div>';
+  return html;
+}
+
+function startWorkout(idx) {
+  appState.workoutIdx = idx;
+  appState.view = 'active';
+  render();
+}
+
+// ── ACTIVE SESSION VIEW ───────────────────────────────────────
+function viewActive() {
+  var idx = appState.workoutIdx;
+  var w = WORKOUTS[idx];
+  var today = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  var sessions = getSessions();
+  var lastSess = sessions.find(function(s){ return s.workoutId === w.id; });
+
+  var html = '<div style="background:var(--bg);min-height:100vh;padding-bottom:100px;" class="fade-in">'
+    + '<div style="background:#fff;border-bottom:3px solid var(--accent);padding:28px 16px 20px;max-width:480px;margin:0 auto;">'
+    + '<button onclick="appState.view=\'programs\';render();" class="back-btn">'
+    + '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>Back</button>'
+    + '<p style="color:rgba(0,0,0,.4);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Calisthenics Made Easy · Coach George Santos</p>'
+    + '<h1 style="font-weight:800;font-size:28px;letter-spacing:-0.5px;color:#0D1B2E;margin-bottom:2px;">'+w.name+'</h1>'
+    + '<p style="color:rgba(0,0,0,.45);font-size:13px;">'+today+'</p>'
+    + '</div>'
+    + '<div style="max-width:480px;margin:0 auto;padding:20px 16px 0;">';
+
+  if (lastSess) {
+    html += '<div style="background:#DBEAFE;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#1D4ED8;display:flex;align-items:center;gap:8px;">'
+      + '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+      + 'Last completed '+new Date(lastSess.date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})+'.</div>';
+  }
+
+  // Video card
+  if (w.videoUrl) {
+    html += '<div class="video-card">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'
+      + '<div style="width:36px;height:36px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+      + '<svg width="16" height="16" fill="#fff" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'
+      + '</div>'
+      + '<div><p style="font-weight:700;font-size:14px;color:#92400E;">Session Video</p>'
+      + (w.tag ? '<p style="font-size:12px;color:#B45309;">'+w.tag+'</p>' : '')
+      + '</div></div>'
+      + '<button onclick="openVideo(\''+w.videoUrl+'\')" style="width:100%;background:var(--accent);color:#fff;font-weight:700;font-size:15px;padding:14px;border-radius:10px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">'
+      + '<svg width="16" height="16" fill="#fff" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Watch Video ▶'
+      + '</button></div>';
+  }
+
+  // Exercise groups (populated as George adds skill drills)
+  if (w.groups && w.groups.length > 0) {
+    w.groups.forEach(function(group, gi) {
+      html += '<div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid var(--border);">'
+        + '<h3 style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:16px;">'+group.name+'</h3>';
+
+      group.exercises.forEach(function(ex, ei) {
+        var key = 'g'+gi+'e'+ei;
+        if (ex.isBodyweight) {
+          if (ei > 0) html += '<div style="border-top:1px solid #F3F4F6;margin:14px 0;"></div>';
+          var lastEx = lastSess && lastSess.exercises && lastSess.exercises.find(function(e){ return e.name === ex.name; });
+          var lastHint = '';
+          if (lastEx && lastEx.sets) {
+            var parts = lastEx.sets.filter(function(s){ return s.reps; }).map(function(s,i){ return 'S'+(i+1)+': '+(s.reps||'?')+'r'; });
+            if (parts.length) lastHint = '<p style="color:#9CA3AF;font-size:11px;margin-bottom:8px;">Last: '+parts.join(' · ')+'</p>';
+          }
+          html += '<div>'
+            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">'
+            + '<span style="color:#0D1B2E;font-size:13px;font-weight:600;">'+ex.name+(ex.video ? ' <button onclick="openVideo(\''+ex.video+'\')" style="color:var(--accent);font-size:11px;background:none;border:none;cursor:pointer;">▶</button>' : '')+'</span>'
+            + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;">'+ex.sets+' × '+ex.reps+'</span>'
+            + '</div>'+lastHint
+            + '<div style="display:grid;grid-template-columns:28px 1fr;gap:4px;margin-bottom:4px;padding:0 2px;">'
+            + '<span style="font-size:10px;color:#9CA3AF;">SET</span>'
+            + '<span style="font-size:10px;color:#9CA3AF;text-align:center;">REPS</span></div>';
+          for (var si = 0; si < ex.sets; si++) {
+            html += '<div style="display:grid;grid-template-columns:28px 1fr;gap:4px;margin-bottom:6px;align-items:center;">'
+              + '<span style="font-size:11px;color:#6B7280;font-weight:500;">'+(si+1)+'</span>'
+              + '<input type="number" min="0" placeholder="reps" id="r-'+key+'-'+si+'" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:9px 6px;text-align:center;font-size:13px;color:#0D1B2E;width:100%;outline:none;" onfocus="this.style.borderColor=\'var(--accent)\'" onblur="this.style.borderColor=\'#E5E7EB\'" />'
+              + '</div>';
+          }
+          html += '</div>';
+        } else {
+          // Weighted exercise
+          if (ei > 0) html += '<div style="border-top:1px solid #F3F4F6;margin:14px 0;"></div>';
+          var lastEx2 = lastSess && lastSess.exercises && lastSess.exercises.find(function(e){ return e.name === ex.name; });
+          var lastHint2 = '';
+          if (lastEx2 && lastEx2.sets) {
+            var parts2 = lastEx2.sets.filter(function(s){ return s.weight||s.reps; }).map(function(s,i){ return 'S'+(i+1)+': '+(s.weight||'?')+'kg×'+(s.reps||'?'); });
+            if (parts2.length) lastHint2 = '<p style="color:#9CA3AF;font-size:11px;margin-bottom:8px;">Last: '+parts2.join(' · ')+'</p>';
+          }
+          html += '<div>'
+            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">'
+            + '<button onclick="openVideo(\''+(ex.video||'')+'\')" style="color:#0D1B2E;font-size:13px;font-weight:600;text-align:left;background:none;border:none;cursor:'+(ex.video?'pointer':'default')+';">'
+            + ex.name+(ex.video?' <span style="color:var(--accent);font-size:11px;">▶</span>':'')
+            + '</button>'
+            + '<span style="color:#9CA3AF;font-size:11px;white-space:nowrap;margin-left:8px;">'+(ex.setsLabel||ex.sets)+' × '+ex.reps+'</span>'
+            + '</div>'+lastHint2
+            + '<div style="display:grid;grid-template-columns:28px 1fr 1fr;gap:4px;margin-bottom:4px;padding:0 2px;">'
+            + '<span style="font-size:10px;color:#9CA3AF;">SET</span>'
+            + '<span style="font-size:10px;color:#9CA3AF;text-align:center;">WEIGHT (kg)</span>'
+            + '<span style="font-size:10px;color:#9CA3AF;text-align:center;">REPS</span></div>';
+          for (var si2 = 0; si2 < ex.sets; si2++) {
+            html += '<div style="display:grid;grid-template-columns:28px 1fr 1fr;gap:4px;margin-bottom:6px;align-items:center;">'
+              + '<span style="font-size:11px;color:#6B7280;font-weight:500;">'+(si2+1)+'</span>'
+              + '<input type="number" min="0" step="0.5" placeholder="kg" id="w-'+key+'-'+si2+'" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:9px 6px;text-align:center;font-size:13px;color:#0D1B2E;width:100%;outline:none;" onfocus="this.style.borderColor=\'var(--accent)\'" onblur="this.style.borderColor=\'#E5E7EB\'" />'
+              + '<input type="number" min="0" placeholder="reps" id="r-'+key+'-'+si2+'" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:9px 6px;text-align:center;font-size:13px;color:#0D1B2E;width:100%;outline:none;" onfocus="this.style.borderColor=\'var(--accent)\'" onblur="this.style.borderColor=\'#E5E7EB\'" />'
+              + '</div>';
+          }
+          html += '</div>';
+        }
+      });
+      html += '</div>';
+    });
+  }
+
+  html += '<div class="card">'
+    + '<label style="display:block;font-size:11px;color:#6B7280;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Session Notes</label>'
+    + '<textarea id="session-notes" rows="3" placeholder="How did it feel? What skills did you notice improving?" style="width:100%;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:12px;font-size:13px;color:#0D1B2E;resize:none;outline:none;" onfocus="this.style.borderColor=\'var(--accent)\'" onblur="this.style.borderColor=\'#E5E7EB\'"></textarea>'
+    + '</div>'
+    + '<button onclick="completeWorkout()" class="cta-btn" style="width:100%;font-size:1.1rem;padding:18px;text-align:center;border-radius:14px;margin-bottom:8px;">Complete Session ✓</button>'
+    + '</div></div>';
+
+  return html;
+}
+
+async function completeWorkout() {
+  var idx = appState.workoutIdx;
+  var w = WORKOUTS[idx];
+  var exercises = [];
+
+  if (w.groups && w.groups.length > 0) {
+    w.groups.forEach(function(group, gi) {
+      group.exercises.forEach(function(ex, ei) {
+        var key = 'g'+gi+'e'+ei;
+        if (ex.isBodyweight) {
+          var sets = [];
+          for (var si = 0; si < ex.sets; si++) {
+            sets.push({ reps: (document.getElementById('r-'+key+'-'+si)||{}).value || '' });
+          }
+          exercises.push({group:group.name, name:ex.name, prescribed:ex.sets+'×'+ex.reps, sets:sets});
+        } else {
+          var sets2 = [];
+          for (var si2 = 0; si2 < ex.sets; si2++) {
+            sets2.push({
+              weight: (document.getElementById('w-'+key+'-'+si2)||{}).value || '',
+              reps:   (document.getElementById('r-'+key+'-'+si2)||{}).value || '',
+            });
+          }
+          exercises.push({group:group.name, name:ex.name, prescribed:(ex.setsLabel||ex.sets)+'×'+ex.reps, sets:sets2});
+        }
+      });
+    });
+  }
+
+  var s = {
+    id: Date.now(),
+    date: new Date().toISOString(),
+    workoutId: w.id,
+    workoutName: w.name,
+    hasVideo: !!(w.videoUrl),
+    exercises: exercises,
+    notes: (document.getElementById('session-notes')||{}).value || '',
+  };
+  var btn = document.querySelector('button[onclick="completeWorkout()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  await saveSessionData(s);
+  appState.view = 'history';
+  renderNav('history');
+  render();
+}
+
+// ── HISTORY VIEW ──────────────────────────────────────────────
+function viewHistory() {
+  var sessions = getSessions();
+  var cards = '';
+  if (!sessions.length) {
+    cards = '<div style="text-align:center;padding:80px 0;color:#9CA3AF;">'
+      + '<svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin:0 auto 16px;opacity:.3;display:block;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+      + '<p style="font-weight:600;">No sessions yet.</p>'
+      + '<p style="font-size:13px;margin-top:4px;">Complete a workout to see your history here.</p></div>';
+  } else {
+    sessions.forEach(function(s) {
+      var d = new Date(s.date);
+      var dateStr = d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+      var timeStr = d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      cards += '<div onclick="gotoDetail('+s.id+')" class="card" style="cursor:pointer;border-left:4px solid var(--accent);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+        + '<div>'
+        + '<span class="pill" style="margin-bottom:6px;display:inline-block;">CME · '+s.workoutName+'</span>'
+        + '<h3 style="font-size:17px;font-weight:700;color:#0D1B2E;">'+s.workoutName+'</h3>'
+        + '<p style="color:#9CA3AF;font-size:11px;margin-top:2px;">'+dateStr+' · '+timeStr+'</p>'
+        + '</div>'
+        + '<svg width="18" height="18" fill="none" stroke="#CBD5E1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>'
+        + '</div>'
+        + (s.notes ? '<p style="color:#9CA3AF;font-size:11px;margin-top:10px;border-top:1px solid #F3F4F6;padding-top:10px;font-style:italic;">"'+s.notes.substring(0,90)+(s.notes.length>90?'…':'')+('"')+'</p>' : '')
+        + '</div>';
+    });
+  }
+  return '<div class="fade-in" style="background:var(--bg);min-height:100vh;padding-bottom:80px;">'
+    + '<div style="padding:40px 16px 24px;max-width:480px;margin:0 auto;">'
+    + '<h1 style="font-size:32px;font-weight:700;color:#111827;margin-bottom:4px;">History</h1>'
+    + '<p style="color:rgba(0,0,0,.5);font-size:13px;">'+sessions.length+' session'+(sessions.length!==1?'s':'')+' logged</p>'
+    + '</div>'
+    + '<div style="padding:0 16px;max-width:480px;margin:0 auto;">'+cards+'</div></div>';
+}
+
+function gotoDetail(id) {
+  appState.sessionId = id;
+  appState.view = 'detail';
+  render();
+}
+
+// ── DETAIL VIEW ───────────────────────────────────────────────
+function viewDetail() {
+  var s = getSessions().find(function(x){ return x.id === appState.sessionId; });
+  if (!s) return viewHistory();
+  var d = new Date(s.date);
+  var dateStr = d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  var bodyHtml = '';
+
+  if (s.hasVideo) {
+    var workout = WORKOUTS.find(function(w){ return w.id === s.workoutId; });
+    if (workout && workout.videoUrl) {
+      bodyHtml += '<div style="margin-bottom:16px;">'
+        + '<button onclick="openVideo(\''+workout.videoUrl+'\')" style="background:var(--accent);color:#fff;font-weight:700;font-size:13px;padding:10px 18px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;">'
+        + '<svg width="14" height="14" fill="#fff" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Rewatch Video'
+        + '</button></div>';
+    }
+  }
+
+  if (s.exercises && s.exercises.length > 0) {
+    var currentGroup = '';
+    s.exercises.forEach(function(ex) {
+      if (ex.group !== currentGroup) {
+        if (currentGroup) bodyHtml += '</div>';
+        currentGroup = ex.group;
+        bodyHtml += '<div style="margin-bottom:16px;">'
+          + '<p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:10px;">'+ex.group+'</p>';
+      }
+      var setsText = (ex.sets||[]).filter(function(ss){ return ss.weight||ss.reps; })
+        .map(function(ss,i){
+          var val = ss.weight ? (ss.weight||'–')+'kg × '+(ss.reps||'–') : (ss.reps||'–')+' reps';
+          return '<span style="background:#F3F4F6;border-radius:6px;padding:3px 7px;font-size:11px;margin-right:4px;">S'+(i+1)+': '+val+'</span>';
+        }).join('');
+      bodyHtml += '<div style="margin-bottom:12px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">'
+        + '<p style="font-size:13px;font-weight:600;color:#0D1B2E;">'+ex.name+'</p>'
+        + '<span style="font-size:11px;color:#9CA3AF;">'+ex.prescribed+'</span>'
+        + '</div>'
+        + (setsText || '<span style="font-size:11px;color:#9CA3AF;">No data recorded</span>')
+        + '</div>';
+    });
+    if (currentGroup) bodyHtml += '</div>';
+  } else if (!s.hasVideo) {
+    bodyHtml = '<p style="font-size:13px;color:#9CA3AF;">No exercise data recorded.</p>';
+  }
+
+  if (!bodyHtml) bodyHtml = '<p style="font-size:13px;color:#9CA3AF;font-style:italic;">Video session completed.</p>';
+
+  return '<div class="fade-in" style="background:var(--bg);min-height:100vh;padding-bottom:80px;">'
+    + '<div style="background:#fff;border-bottom:3px solid var(--accent);padding:28px 16px 20px;max-width:480px;margin:0 auto;">'
+    + '<button onclick="appState.view=\'history\';render();" class="back-btn"><svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>History</button>'
+    + '<span class="pill" style="margin-bottom:6px;display:inline-block;">Calisthenics Made Easy</span>'
+    + '<h1 style="font-size:28px;font-weight:700;color:#0D1B2E;">'+s.workoutName+'</h1>'
+    + '<p style="color:rgba(0,0,0,.45);font-size:13px;margin-top:2px;">'+dateStr+'</p>'
+    + '</div>'
+    + '<div style="max-width:480px;margin:0 auto;padding:20px 16px;">'
+    + '<div class="card">'+bodyHtml+'</div>'
+    + (s.notes ? '<div class="card"><p style="font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Notes</p><p style="font-size:14px;color:#374151;font-style:italic;line-height:1.6;">"'+s.notes+'"</p></div>' : '')
+    + '<button onclick="deleteSessionPrompt('+s.id+')" style="background:none;border:1px solid #FCA5A5;color:#EF4444;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-top:8px;">Delete Session</button>'
+    + '</div></div>';
+}
+
+function deleteSessionPrompt(id) {
+  if (confirm('Delete this session? This cannot be undone.')) {
+    deleteSessionData(id);
+    appState.view = 'history';
+    render();
+  }
+}
+
+// ── FIREBASE INIT ─────────────────────────────────────────────
+firebase.initializeApp(FB_CFG);
+fbAuth = firebase.auth();
+db = firebase.firestore();
+
+fbAuth.onAuthStateChanged(async function(user) {
+  authResolved = true;
+  if (user) {
+    uid = user.uid;
+    try {
+      var snap = await db.collection('users').doc(uid).collection('cme_sessions').orderBy('date','desc').get();
+      cachedSessions = snap.docs.map(function(d){ return d.data(); });
+    } catch(e) {
+      cachedSessions = JSON.parse(localStorage.getItem('cme_sessions') || '[]');
+    }
+    appState.view = 'programs';
+    renderNav('programs');
+  } else {
+    uid = null;
+    cachedSessions = [];
+    appState.view = 'auth';
+    renderNav('');
+  }
+  render();
+});
+</script>
+</body>
+</html>
