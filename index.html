@@ -262,10 +262,10 @@ function viewPrograms() {
 
   var html = '<div class="fade-in" style="background:var(--bg);min-height:100vh;padding-bottom:80px;">';
 
-  html += '<div style="background:linear-gradient(160deg,#0F172A 0%,#1E3A5F 100%);padding:40px 20px 32px;">'
+  html += '<div style="background:linear-gradient(160deg,#0F172A 0%,#1E3A5F 100%);padding:40px 20px 32px;text-align:center;">'
     + '<p style="color:rgba(255,255,255,.45);font-size:.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Coach George Santos</p>'
     + '<h1 style="color:#fff;font-size:clamp(1.6rem,6vw,2.4rem);font-weight:800;letter-spacing:-1px;line-height:1.1;margin-bottom:16px;">Calisthenics Made Easy</h1>'
-    + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+    + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;">'
     + '<span style="background:rgba(217,119,6,.2);border:1px solid rgba(217,119,6,.4);color:#FDE68A;font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 12px;border-radius:999px;">'
     + total + ' Workout' + (total !== 1 ? 's' : '') + ' · Skill-Based</span>'
     + '<span style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);font-size:.7rem;font-weight:600;padding:5px 12px;border-radius:999px;">'
@@ -582,9 +582,9 @@ function viewDetail() {
           return '<span style="background:#F3F4F6;border-radius:6px;padding:3px 7px;font-size:11px;margin-right:4px;">S'+(i+1)+': '+val+'</span>';
         }).join('');
       bodyHtml += '<div style="margin-bottom:12px;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">'
-        + '<p style="font-size:13px;font-weight:600;color:#0D1B2E;">'+ex.name+'</p>'
-        + '<span style="font-size:11px;color:#9CA3AF;">'+ex.prescribed+'</span>'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">'
+        + '<p style="font-size:13px;font-weight:600;color:#0D1B2E;flex:1;min-width:0;">'+ex.name+'</p>'
+        + '<span style="font-size:11px;color:#9CA3AF;white-space:nowrap;margin-left:8px;flex-shrink:0;">'+ex.prescribed+'</span>'
         + '</div>'
         + (setsText || '<span style="font-size:11px;color:#9CA3AF;">No data recorded</span>')
         + '</div>';
